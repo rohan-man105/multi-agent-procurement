@@ -1,0 +1,44 @@
+version: '3.4'
+
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.38.0
+    container_name: weaviate
+    restart: on-failure:0
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 20
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'   # vectors are supplied by your Python code, not Weaviate
+      ENABLE_MODULES: ''
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - multiagent_net
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: on-failure:0
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - multiagent_net
+
+volumes:
+  weaviate_data:
+  postgres_data:
+
+networks:
+  multiagent_net:
+    driver: bridge
