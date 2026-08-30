@@ -4,6 +4,7 @@ from agents.stream_events import RunItemStreamEvent
 from services.agentservices.orchestrator import orchestrator, OrchestratorOutput
 from services.agentservices.retention import modifier, ModifierOutput
 from services.agentservices.acquisition import initiation, InitiatorOutput
+from services.postgremanager.new_order import add_new_order
 
 
 orch_agent = orchestrator()
@@ -57,5 +58,28 @@ async def handle_turn(current_agent: str, history: list, user_input: str):
 
     if current_agent == "modifier" and final.stop_flag and final.handoff_to_new:
         return await handle_turn("acquisition", [], "")
+
+        if current_agent == "acquisition" and final.stop_flag:
+            new_order = add_new_order(
+            item_name=final.item_name,
+            category=final.category,
+            quantity=final.quantity,
+        )
+
+        reply = (
+            f"{final.reply}\n\n"
+            f"New order saved:\n"
+            f"Transaction ID: {new_order['TransactionID']}\n"
+            f"Item Name: {new_order['ItemName']}\n"
+            f"Category: {new_order['Category']}\n"
+            f"Quantity: {new_order['Quantity']}\n"
+            f"Unit Price: {new_order['UnitPrice']}\n"
+            f"Total Cost: {new_order['TotalCost']}\n"
+            f"Purchase Date: {new_order['PurchaseDate']}\n"
+            f"Supplier: {new_order['Supplier']}\n"
+            f"Buyer: {new_order['Buyer']}"
+        )
+
+        return reply, "orchestrator", []
     
     return final.reply, current_agent, history

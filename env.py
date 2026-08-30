@@ -7,13 +7,10 @@ from agents import ModelSettings
 load_dotenv()
 
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 OPEN_ROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_API_KEYY = os.getenv("GROQ_API_KEYY")
-url = "/home/ubox48/MultiAgentProject/dataset/spend_analysis_dataset.csv"
+
+url = "dataset/spend_analysis_dataset.csv"
 
 nvidia_client = AsyncOpenAI(
         api_key=OPEN_ROUTER_API_KEY,
@@ -21,7 +18,7 @@ nvidia_client = AsyncOpenAI(
 )
 
 nvidia_model = OpenAIChatCompletionsModel(
-        model="openai/gpt-4.1-mini",
+        model="google/gemma-4-26b-a4b-it:free",
         openai_client=nvidia_client
 )
 
