@@ -47,10 +47,11 @@ _CARD_CSS = """
 def render():
     st.markdown(_CARD_CSS, unsafe_allow_html=True)
 
-    st.markdown("## ⚙️ Settings")
-    st.caption("Configure the connection to your Multi-Agent backend.")
+    st.markdown('<div class="eyebrow">Workspace controls</div>', unsafe_allow_html=True)
+    st.markdown("# Settings")
+    st.markdown('<div class="page-intro">Manage the backend connection and reset the current procurement conversation.</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="settings-card"><h4>🌐 API Connection</h4>', unsafe_allow_html=True)
+    st.markdown('<div class="settings-card"><h4>API connection</h4>', unsafe_allow_html=True)
 
     new_url = st.text_input(
         "API Base URL",
@@ -60,12 +61,12 @@ def render():
 
     col1, col2 = st.columns([1, 4])
     with col1:
-        if st.button("💾 Save", use_container_width=True):
+        if st.button("Save connection", use_container_width=True, type="primary"):
             st.session_state.api_base_url = new_url.rstrip("/")
             st.success("Saved!")
 
     with col2:
-        if st.button("🔍 Test Connection", use_container_width=True):
+        if st.button("Test connection", use_container_width=True):
             with st.spinner("Testing…"):
                 data = api_get("/")
             if data is not None:
@@ -84,10 +85,10 @@ def render():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="settings-card"><h4>🧹 Session Management</h4>', unsafe_allow_html=True)
+    st.markdown('<div class="settings-card"><h4>Session management</h4>', unsafe_allow_html=True)
     st.markdown("Clear conversation history and reset the active agent to the default orchestrator.")
 
-    if st.button("🗑️ Reset Chat Session", use_container_width=False):
+    if st.button("Reset chat session", use_container_width=False):
         st.session_state.chat_history = []
         st.session_state.current_agent = "orchestrator"
         st.session_state.agent_history = []
@@ -95,7 +96,7 @@ def render():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="settings-card"><h4>📌 Current Session</h4>', unsafe_allow_html=True)
+    st.markdown('<div class="settings-card"><h4>Current session</h4>', unsafe_allow_html=True)
 
     info_cols = st.columns(3)
     with info_cols[0]:

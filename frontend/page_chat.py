@@ -13,15 +13,15 @@ _CHAT_CSS = """
 .chat-container {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding-bottom: 1rem;
+    gap: 0.85rem;
+    padding: 0.35rem 0 1.25rem;
 }
 .chat-bubble {
-    max-width: 80%;
-    padding: 0.9rem 1.15rem;
+    max-width: min(78%, 780px);
+    padding: 0.85rem 1.1rem;
     border-radius: 1rem;
     line-height: 1.55;
-    font-size: 0.95rem;
+    font-size: 0.94rem;
     word-wrap: break-word;
     animation: fadeSlideIn 0.3s ease-out;
 }
@@ -43,6 +43,22 @@ _CHAT_CSS = """
     border: 1px solid #334155;
     border-bottom-left-radius: 0.25rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.chat-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #94A3B8;
+    font-size: 0.78rem;
+    padding: 0 0.15rem 0.75rem;
+}
+.agent-pill {
+    color: #C4B5FD;
+    background: rgba(124,58,237,0.14);
+    border: 1px solid rgba(167,139,250,0.28);
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+    text-transform: capitalize;
 }
 .bubble-label {
     font-size: 0.7rem;
@@ -93,8 +109,13 @@ def _render_bubble(role: str, content: str) -> str:
 def render():
     st.markdown(_CHAT_CSS, unsafe_allow_html=True)
 
-    st.markdown("## 💬 Chat")
-    st.caption("Ask questions about spend data, procurement insights, or anything the agents can help with.")
+    st.markdown('<div class="eyebrow">Procurement copilot</div>', unsafe_allow_html=True)
+    st.markdown("# Start a procurement conversation")
+    st.markdown('<div class="page-intro">Coordinate a new request or renew an existing order with help from the agent workflow.</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="chat-meta"><span>Conversation workspace</span><span class="agent-pill">{st.session_state.get("current_agent", "orchestrator")}</span></div>',
+        unsafe_allow_html=True,
+    )
 
     if st.session_state.chat_history:
         bubbles_html = '<div class="chat-container">'
@@ -105,13 +126,8 @@ def render():
         bubbles_html += '</div>'
         st.markdown(bubbles_html, unsafe_allow_html=True)
     else:
-        st.markdown(
-            '<div style="text-align:center;padding:3rem 0;opacity:0.5;">'
-            '<p style="font-size:2.5rem;margin:0;">🤖</p>'
-            '<p>Start a conversation by typing a message below.</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+        st.info("Your procurement workspace is ready. Send a message to begin.")
+        st.markdown("Try: **I need to procure laptops for the design team**")
 
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_input(
@@ -119,11 +135,11 @@ def render():
             placeholder="Type your message…",
             label_visibility="collapsed",
         )
-        col1, col2, col3 = st.columns([6, 1, 1])
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            submitted = st.form_submit_button("Send message  →", use_container_width=True, type="primary")
         with col2:
-            submitted = st.form_submit_button("Send ➤", use_container_width=True)
-        with col3:
-            clear = st.form_submit_button("🗑️ Clear", use_container_width=True)
+            clear = st.form_submit_button("Clear", use_container_width=True)
 
     if clear:
         st.session_state.chat_history = []

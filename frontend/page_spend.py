@@ -107,15 +107,17 @@ def _styled(fig: go.Figure) -> go.Figure:
 def render():
     st.markdown(_CARD_CSS, unsafe_allow_html=True)
 
-    st.markdown("## 📊 Spend Analysis")
-    st.caption("Interactive dashboards built from your procurement dataset.")
+    st.markdown('<div class="eyebrow">Portfolio intelligence</div>', unsafe_allow_html=True)
+    st.markdown("# Spend overview")
+    st.markdown('<div class="page-intro">Understand where procurement dollars are going, who is buying, and how activity is trending.</div>', unsafe_allow_html=True)
 
     df = _load_data()
     if df.empty:
         return
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🔍 Filters")
+    st.sidebar.markdown("### Filter the portfolio")
+    st.sidebar.caption("All visuals update from the selected records.")
 
     min_date = df["PurchaseDate"].min().date() if "PurchaseDate" in df.columns else datetime.date(2024, 1, 1)
     max_date = df["PurchaseDate"].max().date() if "PurchaseDate" in df.columns else datetime.date(2024, 12, 31)
@@ -151,7 +153,7 @@ def render():
     avg_order = total_spend / total_txns if total_txns else 0
     n_suppliers = filtered["Supplier"].nunique() if "Supplier" in filtered.columns else 0
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(4, gap="medium")
     with c1:
         st.markdown(_metric_html("Total Spend", f"${total_spend:,.0f}"), unsafe_allow_html=True)
     with c2:
@@ -163,7 +165,8 @@ def render():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    col_left, col_right = st.columns(2)
+    st.markdown("### Portfolio breakdown")
+    col_left, col_right = st.columns(2, gap="medium")
 
     with col_left:
         if "Category" in filtered.columns and "TotalCost" in filtered.columns:
@@ -198,7 +201,8 @@ def render():
             )
             st.plotly_chart(_styled(fig_pie), use_container_width=True)
 
-    col_left2, col_right2 = st.columns(2)
+    st.markdown("### Momentum and concentration")
+    col_left2, col_right2 = st.columns(2, gap="medium")
 
     with col_left2:
         if "PurchaseDate" in filtered.columns and "TotalCost" in filtered.columns:
@@ -242,7 +246,8 @@ def render():
             fig_hbar.update_coloraxes(showscale=False)
             st.plotly_chart(_styled(fig_hbar), use_container_width=True)
 
-    col_left3, col_right3 = st.columns(2)
+    st.markdown("### Detail views")
+    col_left3, col_right3 = st.columns(2, gap="medium")
 
     with col_left3:
         if "ItemName" in filtered.columns and "TotalCost" in filtered.columns:
@@ -281,7 +286,7 @@ def render():
             )
             st.plotly_chart(_styled(fig_heat), use_container_width=True)
 
-    with st.expander("📋 View Raw Data", expanded=False):
+    with st.expander("View filtered transaction data", expanded=False):
         st.dataframe(
             filtered.sort_values("PurchaseDate", ascending=False) if "PurchaseDate" in filtered.columns else filtered,
             use_container_width=True,

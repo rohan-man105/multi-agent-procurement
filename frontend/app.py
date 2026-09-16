@@ -12,7 +12,7 @@ from helpers import init_session_state
 
 
 st.set_page_config(
-    page_title="Multi-Agent Spend Analysis",
+    page_title="ProcureAI | Multi-Agent Procurement",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -33,7 +33,7 @@ st.markdown(
 
     /* ── Sidebar ─────────────────────────────────────────────────── */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+        background: linear-gradient(180deg, #0B1120 0%, #111C33 100%);
         border-right: 1px solid #334155;
     }
     section[data-testid="stSidebar"] .stRadio label {
@@ -66,7 +66,31 @@ st.markdown(
 
     /* ── Scroll-to-bottom for chat ───────────────────────────────── */
     .block-container {
-        padding-top: 1.5rem;
+        max-width: 1480px;
+        padding-top: 2.25rem;
+        padding-bottom: 3rem;
+    }
+
+    div[data-testid="stMetric"] {
+        background: rgba(30, 41, 59, 0.58);
+        border: 1px solid #334155;
+        border-radius: 0.85rem;
+        padding: 0.85rem 1rem;
+    }
+    div[data-testid="stMetricLabel"] { color: #94A3B8; }
+    div[data-testid="stMetricValue"] { color: #F8FAFC; }
+    .eyebrow {
+        color: #A78BFA;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 0.35rem;
+    }
+    .page-intro {
+        color: #94A3B8;
+        font-size: 0.98rem;
+        margin-bottom: 1.6rem;
     }
 
     /* ── Custom title ────────────────────────────────────────────── */
