@@ -1,39 +1,28 @@
-import weaviate.classes.config as wc
+from pathlib import Path
+
 import pandas as pd
-from env import url
-from services.weaviatemanager.utils import client, model
+import weaviate.classes.config as wc
+
+from services.weaviatemanager.sync import EMBED_COLUMNS, upsert_order
+from services.weaviatemanager.utils import get_client
 
 
-data = pd.read_csv(url)
-data["PurchaseDate"] = pd.to_datetime(data["PurchaseDate"]).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-EMBED_COLUMNS = ["ItemName", "Category", "Supplier", "Buyer"]
+DATASET_PATH = Path(__file__).resolve().parents[2] / "dataset" / "spend_analysis_dataset.csv"
 
 
 def create_embeddings():
+    client = get_client()
     if not client.collections.exists("Order"):
         client.collections.create(
             name="Order",
             vectorizer_config=[
-                wc.Configure.NamedVectors.none(name=f"{col}_vector")
-                for col in EMBED_COLUMNS
-            ]
+                wc.Configure.NamedVectors.none(name=f"{column}_vector")
+                for column in EMBED_COLUMNS
+            ],
         )
 
-    order_collection = client.collections.use("Order")
+    data = pd.read_csv(DATASET_PATH).fillna("")
+    for row in data.to_dict(orient="records"):
+        upsert_order(row)
 
-    with order_collection.batch.dynamic() as batch:
-        for _, row in data.iterrows():
-            content = {k: (v.item() if hasattr(v, "item") else v) for k, v in row.to_dict().items()}
-            batch.add_object(
-                properties=content,
-                vector={
-                    f"{col}_vector": model.encode(
-                        str(content[col]),
-                        normalize_embeddings=True
-                    ).tolist()
-                    for col in EMBED_COLUMNS
-                }
-            )
-
-    print("\nOrder Embeddings Completed\n")
+    print(f"\nOrder Embeddings Synchronized: {len(data)}\n")

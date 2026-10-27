@@ -21,8 +21,9 @@ def get_info(query:str , limit: int=5) -> list[dict]:
             limit=limit,
             query_properties=["ItemName", "Category", "Supplier", "Buyer"],
             return_properties=[
-    "transactionID", "itemName", "category", "quantity",
-    "unitPrice", "totalCost", "purchaseDate", "supplier", "buyer"
+    "TransactionID", "OrderType", "ParentTransactionID", "Status",
+    "ItemName", "Category", "Quantity", "UnitPrice", "TotalCost",
+    "PurchaseDate", "Supplier", "Buyer", "Currency"
 ],
             return_metadata=wq.MetadataQuery(score=True)
         )
@@ -45,7 +46,7 @@ def format_docs(docs: list[dict]) -> str:
     for i, doc in enumerate(docs, start=1):
         block = (
             f"[Order {i}] (relevance score: {doc.get('_score', 'N/A'):.3f})\n"
-            f"  Transaction ID : {doc.get('transactionID', doc.get('TransactionID', 'N/A'))}\n"
+            f"  Transaction ID : {doc.get('TransactionID', doc.get('transactionID', 'N/A'))}\n"
             f"  Item Name      : {doc.get('itemName', doc.get('ItemName', 'N/A'))}\n"
             f"  Category       : {doc.get('category', doc.get('Category', 'N/A'))}\n"
             f"  Quantity       : {doc.get('quantity', doc.get('Quantity', 'N/A'))}\n"
@@ -57,4 +58,4 @@ def format_docs(docs: list[dict]) -> str:
         )
         blocks.append(block)
 
-    return "\n\n".join(blocks)   
+    return "\n\n".join(blocks)

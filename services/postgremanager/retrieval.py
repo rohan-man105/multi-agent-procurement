@@ -2,10 +2,10 @@ from services.postgremanager.utils import get_connection
 
 
 
-def run_sql_query(sql_query):
+def run_sql_query(sql_query, params=None):
     conn = get_connection()
     curr = conn.cursor()
-    curr.execute(sql_query)
+    curr.execute(sql_query, params or ())
     rows = curr.fetchall()
     columns = [desc[0] for desc in curr.description]
     curr.close()

@@ -1,30 +1,27 @@
 # Multi-Agent Procurement System
 
-This is a procurement assistant I built to experiment with multi-agent workflows, structured data retrieval, and semantic search in one project. The idea is simple: a user should be able to talk to the system in natural language, and the backend should decide whether the request is for a new procurement order or a renewal of an existing one.
+An agent-powered procurement assistant for creating new orders, renewing previous orders, searching procurement history, and analyzing spend.
 
-The project combines a FastAPI backend, OpenAI Agents SDK based agents, PostgreSQL for exact order lookup, Weaviate for semantic search, and a Streamlit frontend for chat and spend analysis.
+The system combines a FastAPI backend, OpenAI Agents SDK workflows, PostgreSQL persistence, Weaviate semantic search, and a Streamlit frontend.
 
-## Why I Built This
+## Current status
 
-Procurement workflows usually involve a mix of structured information and messy user input. A user may know the exact transaction ID, or they may only remember something like "the laptop order from last quarter". I wanted to build a system that can handle both cases:
+This project is a functional multi-agent procurement foundation. It supports live persistence workflows, but it is not yet a complete enterprise procurement platform. Authentication, approval policies, ERP integrations, background jobs, and production monitoring are still planned.
 
-- exact lookup through PostgreSQL
-- semantic lookup through Weaviate
-- agent routing based on user intent
-- a simple frontend for testing the full flow
-- a spend dashboard to explore the procurement dataset
+## Features
 
-## Main Features
-
-- Multi-agent conversation flow for procurement requests
-- Orchestrator agent that decides where the user should go next
-- Acquisition agent for collecting details for a new order
-- Retention agent for finding and renewing previous orders
-- PostgreSQL storage for structured procurement records
-- Weaviate vector search for natural-language order lookup
-- FastAPI endpoint for chat interaction
-- Streamlit frontend with chat, settings, and spend dashboard pages
-- Docker Compose setup for PostgreSQL and Weaviate
+- Orchestrator agent for routing new and renewal requests.
+- Acquisition agent for collecting new-order details.
+- Retention agent for locating previous orders by ID or description.
+- PostgreSQL as the runtime source of truth for orders.
+- Weaviate hybrid semantic search over procurement records.
+- New order creation with validation and calculated totals.
+- Renewal creation as a new row linked to the original order.
+- Existing-order modification support.
+- Audit events for renewals and modifications.
+- CSV synchronization for analytics and export compatibility.
+- Streamlit chat, spend analysis, and settings pages.
+- Docker Compose setup for PostgreSQL and Weaviate.
 
 ## Architecture
 
@@ -33,144 +30,185 @@ User
   |
   v
 Streamlit Frontend
-  - Chat page
-  - Spend analysis page
-  - Settings page
+  - Chat
+  - Spend analysis
+  - Settings
   |
-  | HTTP request
+  | HTTP
   v
 FastAPI Backend
   |
   v
 Agent Runtime
-  |
-  +-- Orchestrator Agent
-  |     - collects the user's procurement need
-  |     - asks for a title
-  |     - decides if it is a new order or renewal
+  +-- Orchestrator
+  |     Routes the request to new procurement or renewal.
   |
   +-- Acquisition Agent
-  |     - handles new procurement requests
-  |     - collects item name, category, and quantity
+  |     Collects item, category, quantity, supplier, price, and buyer.
   |
   +-- Retention Agent
-        - handles renewal requests
-        - searches by transaction ID using PostgreSQL
-        - searches by description using Weaviate
-        - asks the user what they want to update
+        Searches previous orders and collects renewal changes.
 
-Data Layer
-  |
-  +-- PostgreSQL
-  |     - stores the CSV data as an orders table
-  |     - used for exact transaction ID search
-  |
-  +-- Weaviate
-        - stores vector embeddings for order fields
-        - used for semantic search on item/category/supplier/buyer
+Runtime data flow
+  PostgreSQL  → authoritative order storage
+       |
+       +-- CSV export/analytics copy
+       |
+       +-- Weaviate semantic search index
 ```
 
-## How The Flow Works
+## Order lifecycle
 
-1. The user starts a conversation from the Streamlit chat page.
-2. The FastAPI backend sends the message to the current active agent.
-3. The Orchestrator first asks what the user wants to procure, what title to give the request, and whether it is a new order or a renewal.
-4. If it is a new order, the conversation moves to the Acquisition Agent.
-5. If it is a renewal, the conversation moves to the Retention Agent.
-6. The Retention Agent can search previous orders in two ways:
-   - by transaction ID through PostgreSQL
-   - by natural-language description through Weaviate
-7. The backend returns the agent reply and updated conversation state to the frontend.
+### New order
 
-## Tech Stack
+```text
+Collect details
+  → Validate quantity and price
+  → Insert into PostgreSQL
+  → Update CSV export
+  → Upsert the order in Weaviate
+```
 
-| Part | Technology |
-|------|------------|
+New orders are stored with `OrderType = new`. If the price is not available, the order remains a draft instead of receiving an invented value.
+
+### Renewal
+
+A renewal creates a new procurement row. It does not overwrite the original order.
+
+```text
+Find original order
+  → Confirm it with the user
+  → Collect the changed value
+  → Insert a new renewal row
+  → Set ParentTransactionID to the original transaction
+  → Write an audit event
+  → Synchronize CSV and Weaviate
+```
+
+### Modification
+
+An existing order can be updated directly. The original transaction ID remains the same, and an audit event records the old and new values.
+
+## Data model
+
+The main dataset uses these fields:
+
+| Field | Description |
+|---|---|
+| `TransactionID` | Unique order identifier, such as `TXN501` |
+| `OrderType` | `new`, `renewal`, or `modification` |
+| `ParentTransactionID` | Original transaction ID for a renewal |
+| `Status` | `draft`, `pending_approval`, `approved`, `ordered`, `completed`, or `cancelled` |
+| `ItemName` | Procured item or service |
+| `Category` | Procurement category |
+| `Quantity` | Positive whole-number quantity |
+| `UnitPrice` | Price per unit |
+| `TotalCost` | Calculated as quantity × unit price |
+| `PurchaseDate` | ISO-formatted purchase date |
+| `Supplier` | Supplier name |
+| `Buyer` | Buyer or responsible person |
+| `Currency` | Currency code, currently defaulting to `USD` |
+
+The CSV file is used to seed PostgreSQL during startup and is updated after runtime writes. PostgreSQL is the authoritative runtime store.
+
+Audit events are stored in:
+
+```text
+PostgreSQL: order_audit_log
+CSV:        dataset/order_audit_log.csv
+```
+
+## Storage and search behavior
+
+### PostgreSQL
+
+PostgreSQL stores exact, structured order records and handles runtime inserts and updates. The startup loader seeds the `orders` table from the CSV dataset.
+
+### Weaviate
+
+Weaviate is a search index, not the source of truth. It stores named vectors for:
+
+- item name
+- category
+- supplier
+- buyer
+
+New and renewed orders are upserted using a stable UUID derived from their transaction ID. Modified orders replace their existing vector record. If Weaviate is temporarily unavailable, the PostgreSQL write remains authoritative and a synchronization warning is logged.
+
+The startup synchronization rebuilds or refreshes the `Order` collection from the CSV data.
+
+## Technology stack
+
+| Area | Technology |
+|---|---|
 | Backend API | FastAPI, Uvicorn |
 | Agent framework | OpenAI Agents SDK |
-| LLM provider | OpenRouter with GPT-4.1 Mini |
-| SQL database | PostgreSQL 16 |
+| Model provider | OpenRouter |
+| Current configured model | `google/gemma-4-26b-a4b-it:free` |
+| Structured database | PostgreSQL 16 |
+| Database access | SQLAlchemy, psycopg2 |
 | Vector database | Weaviate |
-| Embeddings | SentenceTransformers, all-MiniLM-L6-v2 |
+| Embeddings | SentenceTransformers, `all-MiniLM-L6-v2` |
 | Frontend | Streamlit |
 | Charts | Plotly |
-| Data handling | Pandas |
+| Data processing | Pandas |
 | Infrastructure | Docker Compose |
 
-## Project Structure
+## Project structure
 
 ```text
 multi-agent-procurement-system/
   api/
     v1/
-      chat.py                 # FastAPI chat endpoint
+      chat.py                    # FastAPI chat endpoint
 
   dataset/
-    spend_analysis_dataset.csv
+    spend_analysis_dataset.csv   # Seed/export procurement data
+    order_audit_log.csv          # Generated audit export
 
   frontend/
     .streamlit/
-      config.toml             # Streamlit theme config
-    app.py                    # Streamlit entry point
-    helpers.py                # API and session-state helpers
-    page_chat.py              # Chat UI
-    page_settings.py          # Backend URL and session controls
-    page_spend.py             # Spend dashboard
+      config.toml
+    app.py                       # Streamlit entry point
+    helpers.py                   # API and session helpers
+    page_chat.py                 # Chat page
+    page_settings.py             # Connection and session settings
+    page_spend.py                # Spend dashboard
     requirements.txt
-    README.md
 
   services/
     agentservices/
-      acquisition.py          # New-order agent
-      orchestrator.py         # Routing agent
-      retention.py            # Renewal/search agent
-      run.py                  # Agent runner and handoff logic
-      schemas.py              # Agent instructions/prompts
+      acquisition.py             # New-order agent and output schema
+      orchestrator.py            # Routing agent
+      retention.py               # Renewal agent and search tools
+      run.py                     # Agent execution and persistence handoff
+      schemas.py                 # Agent instructions
 
     postgremanager/
-      load.py                 # Loads CSV into PostgreSQL
-      retrieval.py            # SQL query and formatting helpers
-      utils.py                # PostgreSQL connection setup
+      load.py                    # Startup CSV-to-PostgreSQL seed
+      new_order.py               # New, renewal, and modification workflows
+      persistence.py             # PostgreSQL writes and audit persistence
+      retrieval.py               # Parameterized SQL retrieval
+      utils.py                   # Database connection setup
 
     weaviatemanager/
-      load.py                 # Creates Weaviate collection and embeddings
-      retrieval.py            # Hybrid semantic search
-      utils.py                # Weaviate client and embedding model
+      load.py                    # Startup vector synchronization
+      retrieval.py               # Hybrid semantic search
+      sync.py                    # Insert/replace order embeddings
+      utils.py                   # Weaviate client and embedding model
 
-  docker-compose.yml          # PostgreSQL and Weaviate services
-  env.py                      # API/model configuration
-  main.py                     # FastAPI app startup
-  requirements.txt            # Backend dependencies
+  docker-compose.yml             # PostgreSQL and Weaviate services
+  env.py                         # Model and dataset configuration
+  main.py                        # FastAPI application and startup lifecycle
+  requirements.txt               # Backend dependencies
+  ROADMAP.md                     # Stabilization and future development plan
 ```
-
-## Dataset
-
-The project uses `dataset/spend_analysis_dataset.csv`, which contains procurement transaction records with fields like:
-
-| Field | Example |
-|-------|---------|
-| TransactionID | TXN001 |
-| ItemName | Desk Chair |
-| Category | Furniture |
-| Quantity | 10 |
-| UnitPrice | 113.15 |
-| TotalCost | 1131.50 |
-| PurchaseDate | 2024-04-19 |
-| Supplier | TechMart Inc. |
-| Buyer | Kelly Joseph |
-
-When the backend starts, the dataset is loaded into PostgreSQL. The same dataset is also embedded into Weaviate so the retention agent can search previous orders from natural-language descriptions.
 
 ## Setup
 
-### 1. Clone the repository
+### 1. Configure environment variables
 
-```bash
-git clone https://github.com/rohan-man105/multi-agent-procurement.git
-cd multi-agent-procurement
-```
-
-### 2. Create a `.env` file
+Create or update `.env` in the project root:
 
 ```env
 OPEN_ROUTER_API_KEY=your_openrouter_api_key
@@ -181,37 +219,46 @@ POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 ```
 
-`OPENAI_API_KEY` and `GROQ_API_KEY` can also be added if you want to experiment with other providers later, but the current setup uses OpenRouter.
+Do not commit `.env` or real credentials.
 
-### 3. Start PostgreSQL and Weaviate
+### 2. Start PostgreSQL and Weaviate
+
+From the project root:
 
 ```bash
 docker compose up -d
 ```
 
-This starts:
+Services:
 
-- PostgreSQL on port `5432`
-- Weaviate on port `8080`
-- Weaviate gRPC on port `50051`
+```text
+PostgreSQL:  localhost:5432
+Weaviate:    localhost:8080
+Weaviate gRPC: localhost:50051
+```
 
-### 4. Install backend dependencies
+### 3. Install backend dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Run the backend
+### 4. Start the backend
 
 ```bash
 uvicorn main:app --reload
 ```
 
-On startup, the backend loads the dataset into PostgreSQL and creates embeddings in Weaviate.
+At startup, the application:
 
-### 6. Run the frontend
+1. Loads the CSV seed data into PostgreSQL.
+2. Creates the audit table if needed.
+3. Creates or synchronizes the Weaviate `Order` collection.
+4. Starts the chat API.
 
-Open a second terminal:
+### 5. Start the frontend
+
+In another terminal:
 
 ```bash
 cd frontend
@@ -219,21 +266,16 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The frontend runs at:
+Open:
 
 ```text
-http://localhost:8501
+Frontend: http://localhost:8501
+Backend:  http://localhost:8000
 ```
 
-The backend runs at:
+## API
 
-```text
-http://localhost:8000
-```
-
-## API Endpoint
-
-The backend currently exposes one main chat endpoint.
+### Chat
 
 ```http
 POST /chat/
@@ -241,55 +283,80 @@ POST /chat/
 
 Example request:
 
-"""json
+```json
 {
-  "message": "I want to renew my previous chair order",
+  "message": "I want to renew my previous software license",
   "current_agent": "orchestrator",
   "history": []
 }
-"""
+```
+
 Example response:
 
-"""json
+```json
 {
   "response": "What would you like to title this procurement?",
   "current_agent": "orchestrator",
   "history": []
 }
-"""
+```
 
-The frontend keeps passing 'current_agent' and 'history' back to the backend so the conversation can continue with the right agent.
+The current frontend sends the active agent and conversation history with each request. Persistent request IDs and server-side workflow state are planned improvements.
 
-## Frontend Pages
+## Frontend pages
 
-**Chat**
+### Chat
 
-Used for talking to the procurement agents. It stores the current agent, chat messages, and backend conversation history in Streamlit session state.
+Talk to the orchestrator, acquisition, and retention agents. The page tracks the active agent and conversation history in Streamlit session state.
 
-**Spend Analysis**
+### Spend Analysis
 
-Loads the procurement CSV and shows dashboard views such as total spend, transactions, average order value, category spend, supplier spend, monthly trends, and top items.
+Analyzes the synchronized CSV export with filters and Plotly charts for:
 
-**Settings**
+- total spend
+- transaction count
+- average order value
+- supplier spend
+- category spend
+- monthly trends
+- top items
+- buyer/category concentration
 
-Lets the user configure the backend API URL, test the backend connection, and reset the current chat session.
+### Settings
 
-## Current Limitations
+Configures the backend URL, tests the API connection, and resets the current chat session.
 
-- The project currently focuses on the conversation and retrieval flow, not actual database updates after a renewal.
-- The CSV path in 'env.py' is currently configured for my local setup and may need to be changed if the project is moved.
-- Weaviate embeddings are recreated from the dataset during startup if the collection does not already exist.
-- Authentication and user accounts are not included yet.
+## Validation and testing
 
-## Future Improvements
+Static validation currently covers:
 
-- Add real order update/write-back after the Retention Agent confirms changes
-- Make the dataset path fully relative instead of machine-specific
-- Add tests for agent routing and retrieval tools
-- Add API endpoints for spend dashboard data instead of reading CSV directly in the frontend
-- Add authentication for multi-user usage
-- Improve deployment setup for cloud hosting
+- Python syntax for changed modules.
+- Dataset schema validation.
+- Transaction ID generation.
+- Git whitespace checks.
 
-## What I Learned
+Before using the system as a live application, run an end-to-end test with both containers active:
 
-This project helped me connect multiple moving parts into one workflow: agents, API design, SQL retrieval, vector search, Docker services, and frontend state handling. The most interesting part was designing the handoff flow between agents so that each agent has a small, clear responsibility instead of making one large assistant do everything.
+1. Create a new order.
+2. Confirm the row exists in PostgreSQL.
+3. Confirm it appears in the CSV export.
+4. Search for it through Weaviate.
+5. Create a renewal linked to the original transaction.
+6. Modify an existing order.
+7. Check the PostgreSQL and CSV audit logs.
+
+## Current limitations
+
+- Authentication and role-based permissions are not implemented.
+- Supplier and buyer master data are not yet separate database entities.
+- Approval rules are not yet enforced by a policy engine.
+- The frontend still sends conversation history instead of using persistent workflow IDs.
+- PostgreSQL and Weaviate synchronization is not yet handled by a background retry queue.
+- The startup seed currently replaces the `orders` table from the CSV; production migrations should replace this behavior.
+- ERP, email, accounting, CRM, and document integrations are not implemented.
+- Live end-to-end validation requires PostgreSQL and Weaviate containers to be running.
+
+
+## Learning objectives
+
+This project demonstrates how multi-agent workflows can combine structured database retrieval, semantic search, validated business operations, audit logging, and a user-facing procurement interface.
